@@ -1,4 +1,4 @@
-import { ChangeEvent, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, useRef, useState } from 'react'
 import { htmlToMarkdown, joinFrontMatter, markdownToHtml, splitFrontMatter } from './markdown'
 
 const starterMarkdown = `# 새 문서
@@ -27,17 +27,21 @@ export default function App() {
   const [sourceDraft, setSourceDraft] = useState('')
   const [fileName, setFileName] = useState('새 문서')
   const editorRef = useRef<HTMLDivElement>(null)
+  // useRef: 입력 중인 HTML은 React를 다시 렌더링하지 않고 DOM에 유지합니다.
+  // 그래서 브라우저가 관리하는 커서와 한글 조합 상태가 끊기지 않습니다.
+  const editorHtmlRef = useRef('')
   // useRef: 표 안에서 마지막으로 작업한 위치를 다시 렌더링 없이 기억합니다.
   const activeTableRef = useRef<HTMLTableElement | null>(null)
-  // useMemo: HTML이 바뀔 때만 Markdown을 다시 계산합니다.
-  const markdown = useMemo(() => joinFrontMatter(frontMatter, htmlToMarkdown(html)), [frontMatter, html])
 
-  function syncFromEditor() { if (editorRef.current) setHtml(editorRef.current.innerHTML) }
-  function openSource() { setSourceDraft(markdown); setShowSource(true) }
+  function currentHtml() { return editorRef.current?.innerHTML ?? (editorHtmlRef.current || html) }
+  function currentMarkdown() { return joinFrontMatter(frontMatter, htmlToMarkdown(currentHtml())) }
+  function syncFromEditor() { if (editorRef.current) editorHtmlRef.current = editorRef.current.innerHTML }
+  function replaceEditorHtml(nextHtml: string) { editorHtmlRef.current = nextHtml; setHtml(nextHtml) }
+  function openSource() { setSourceDraft(currentMarkdown()); setShowSource(true) }
   function applySource() {
     const imported = splitFrontMatter(sourceDraft)
     setFrontMatter(imported.frontMatter)
-    setHtml(markdownToHtml(imported.body))
+    replaceEditorHtml(markdownToHtml(imported.body))
     setShowSource(false)
   }
   function run(command: Command) { editorRef.current?.focus(); document.execCommand(command); syncFromEditor() }
@@ -75,11 +79,11 @@ export default function App() {
   function openFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; if (!file) return
     const reader = new FileReader()
-    reader.onload = () => { const imported = splitFrontMatter(String(reader.result)); setFrontMatter(imported.frontMatter); setHtml(markdownToHtml(imported.body)); setFileName(file.name.replace(/\.md$/i, '') || '문서') }
+    reader.onload = () => { const imported = splitFrontMatter(String(reader.result)); setFrontMatter(imported.frontMatter); replaceEditorHtml(markdownToHtml(imported.body)); setShowSource(false); setFileName(file.name.replace(/\.md$/i, '') || '문서') }
     reader.readAsText(file); event.target.value = ''
   }
   function download() {
-    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a')
+    const blob = new Blob([currentMarkdown()], { type: 'text/markdown;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a')
     link.href = url; link.download = `${fileName || '문서'}.md`; link.click(); URL.revokeObjectURL(url)
   }
 
