@@ -78,8 +78,9 @@ export default function App() {
     editorRef.current?.focus(); document.execCommand('createLink', false, url); syncFromEditor()
   }
   function insertTable() {
-    const rows = Math.min(10, Math.max(1, Number(window.prompt('행 수를 입력하세요.', '3')) || 3))
-    const columns = Math.min(8, Math.max(1, Number(window.prompt('열 수를 입력하세요.', '3')) || 3))
+    // 모달 없이 바로 쓸 수 있는 3×3 표를 만들고, 행·열 추가로 확장합니다.
+    const rows = 3
+    const columns = 3
     const header = Array.from({ length: columns }, (_, index) => `<th>제목 ${index + 1}</th>`).join('')
     const body = Array.from({ length: Math.max(0, rows - 1) }, () => `<tr>${Array.from({ length: columns }, () => '<td>내용</td>').join('')}</tr>`).join('')
     editorRef.current?.focus(); document.execCommand('insertHTML', false, `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table><p><br></p>`); syncFromEditor()
