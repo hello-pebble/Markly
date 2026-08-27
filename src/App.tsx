@@ -37,6 +37,31 @@ export default function App() {
   function currentMarkdown() { return joinFrontMatter(frontMatter, htmlToMarkdown(currentHtml())) }
   function syncFromEditor() { if (editorRef.current) editorHtmlRef.current = editorRef.current.innerHTML }
   function replaceEditorHtml(nextHtml: string) { editorHtmlRef.current = nextHtml; setHtml(nextHtml) }
+  function currentElement() {
+    const node = window.getSelection()?.anchorNode
+    return node instanceof Element ? node : node?.parentElement ?? null
+  }
+  function placeCursor(element: HTMLElement) {
+    const selection = window.getSelection(); if (!selection) return
+    const range = document.createRange(); range.selectNodeContents(element); range.collapse(true)
+    selection.removeAllRanges(); selection.addRange(range)
+  }
+  function exitToParagraph() {
+    const block = currentElement()?.closest('pre, blockquote')
+    if (block) {
+      const paragraph = document.createElement('p'); paragraph.append(document.createElement('br'))
+      block.insertAdjacentElement('afterend', paragraph); placeCursor(paragraph); syncFromEditor(); return
+    }
+    editorRef.current?.focus(); document.execCommand('formatBlock', false, 'p'); syncFromEditor()
+  }
+  function handleEditorKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    const element = currentElement()
+    const codeBlock = element?.closest('pre')
+    if (codeBlock && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); exitToParagraph(); return }
+    const quote = element?.closest('blockquote')
+    const line = element?.closest('p, div')
+    if (quote && event.key === 'Enter' && line?.textContent?.trim() === '') { event.preventDefault(); exitToParagraph() }
+  }
   function openSource() { setSourceDraft(currentMarkdown()); setShowSource(true) }
   function applySource() {
     const imported = splitFrontMatter(sourceDraft)
@@ -91,12 +116,15 @@ export default function App() {
     <header><div><p className="eyebrow">MARKLY</p><input aria-label="문서 제목" value={fileName} onChange={(e) => setFileName(e.target.value)} /></div><div className="header-actions"><label className="file-button">.md 열기<input type="file" accept=".md,text/markdown" onChange={openFile} /></label><button className="primary" onClick={download}>.md 다운로드</button></div></header>
     <section className="toolbar" aria-label="문서 서식 도구">
       <button onClick={() => run('bold')}><b>B</b><span>굵게</span></button><button onClick={() => run('italic')}><i>I</i><span>기울임</span></button><button onClick={() => run('strikeThrough')}><s>S</s><span>취소선</span></button><div className="divider" />
-      <button onClick={() => formatBlock('h1')}>H1</button><button onClick={() => formatBlock('h2')}>H2</button><button onClick={() => formatBlock('h3')}>H3</button><button onClick={() => formatBlock('blockquote')}>인용</button><button onClick={() => formatBlock('pre')}>{'</>'}</button><div className="divider" />
+      <button onClick={() => formatBlock('h1')}>H1</button><button onClick={() => formatBlock('h2')}>H2</button><button onClick={() => formatBlock('h3')}>H3</button><button onClick={() => formatBlock('blockquote')}>인용</button><button onClick={() => formatBlock('pre')}>{'</>'}</button><button onClick={exitToParagraph}>본문</button><div className="divider" />
       <button onClick={() => run('insertUnorderedList')}>• 목록</button><button onClick={() => run('insertOrderedList')}>1. 목록</button><button onClick={addLink}>링크</button><div className="divider" />
       <button onClick={insertTable}>＋ 표 삽입</button><button onClick={addTableRow}>행 추가</button><button onClick={addTableColumn}>열 추가</button><button className="danger" onClick={deleteTable}>표 삭제</button>
     </section>
-    <div className="mode-switch"><button className={!showSource ? 'active' : ''} onClick={() => showSource && applySource()}>편집</button><button className={showSource ? 'active' : ''} onClick={openSource}>Markdown 원문</button>{showSource && <button className="apply-source" onClick={applySource}>변경사항 반영</button>}</div>
-    {showSource ? <textarea className="source-view" aria-label="Markdown 원문 편집기" value={sourceDraft} onChange={(event) => setSourceDraft(event.target.value)} spellCheck={false} /> : <article ref={editorRef} className="editor" contentEditable suppressContentEditableWarning onInput={syncFromEditor} onMouseUp={(event) => rememberActiveTable(event.target)} onKeyUp={(event) => rememberActiveTable(event.target)} dangerouslySetInnerHTML={{ __html: html }} />}
-    <p className="hint">문서를 클릭해서 바로 수정하세요. 표 안의 셀을 클릭한 뒤 행·열을 추가할 수 있습니다.{frontMatter && ' Jekyll 메타데이터는 별도로 보존됩니다.'}</p>
+    <div className="editor-layout">
+      <aside className="shortcut-guide" aria-label="편집 단축키 안내"><p>빠른 안내</p><h2>단락 마무리</h2><ul><li><kbd>본문</kbd><span>일반 문단으로 전환</span></li><li><kbd>Enter</kbd><span>제목 종료</span></li><li><kbd>Enter</kbd><span>빈 인용문 종료</span></li><li><kbd>Ctrl + Enter</kbd><span>코드 블록 종료</span></li><li><kbd>Shift + Enter</kbd><span>같은 단락 줄바꿈</span></li></ul><small>macOS에서는 Ctrl 대신 Cmd를 사용하세요.</small></aside>
+      <div className="document-area"><div className="mode-switch"><button className={!showSource ? 'active' : ''} onClick={() => showSource && applySource()}>편집</button><button className={showSource ? 'active' : ''} onClick={openSource}>Markdown 원문</button>{showSource && <button className="apply-source" onClick={applySource}>변경사항 반영</button>}</div>
+      {showSource ? <textarea className="source-view" aria-label="Markdown 원문 편집기" value={sourceDraft} onChange={(event) => setSourceDraft(event.target.value)} spellCheck={false} /> : <article ref={editorRef} className="editor" contentEditable suppressContentEditableWarning onInput={syncFromEditor} onKeyDown={handleEditorKeyDown} onMouseUp={(event) => rememberActiveTable(event.target)} onKeyUp={(event) => rememberActiveTable(event.target)} dangerouslySetInnerHTML={{ __html: html }} />}
+      <p className="hint">문서를 클릭해서 바로 수정하세요. 표 안의 셀을 클릭한 뒤 행·열을 추가할 수 있습니다.{frontMatter && ' Jekyll 메타데이터는 별도로 보존됩니다.'}</p></div>
+    </div>
   </main>
 }
