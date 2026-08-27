@@ -3,7 +3,8 @@ import { marked } from 'marked'
 import TurndownService from 'turndown'
 import { gfm } from 'turndown-plugin-gfm'
 
-const turndown = new TurndownService({ bulletListMarker: '-', codeBlockStyle: 'fenced' })
+// 제목은 구분선과 혼동되지 않도록 # 문법으로 저장합니다.
+const turndown = new TurndownService({ bulletListMarker: '-', codeBlockStyle: 'fenced', headingStyle: 'atx' })
 turndown.use(gfm)
 turndown.keep(['nav', 'div', 'span'])
 
