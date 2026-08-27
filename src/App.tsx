@@ -24,6 +24,7 @@ export default function App() {
   const [html, setHtml] = useState(() => markdownToHtml(starterMarkdown))
   const [frontMatter, setFrontMatter] = useState('')
   const [showSource, setShowSource] = useState(false)
+  const [sourceDraft, setSourceDraft] = useState('')
   const [fileName, setFileName] = useState('새 문서')
   const editorRef = useRef<HTMLDivElement>(null)
   // useRef: 표 안에서 마지막으로 작업한 위치를 다시 렌더링 없이 기억합니다.
@@ -32,6 +33,13 @@ export default function App() {
   const markdown = useMemo(() => joinFrontMatter(frontMatter, htmlToMarkdown(html)), [frontMatter, html])
 
   function syncFromEditor() { if (editorRef.current) setHtml(editorRef.current.innerHTML) }
+  function openSource() { setSourceDraft(markdown); setShowSource(true) }
+  function applySource() {
+    const imported = splitFrontMatter(sourceDraft)
+    setFrontMatter(imported.frontMatter)
+    setHtml(markdownToHtml(imported.body))
+    setShowSource(false)
+  }
   function run(command: Command) { editorRef.current?.focus(); document.execCommand(command); syncFromEditor() }
   function formatBlock(tag: 'h1' | 'h2' | 'h3' | 'blockquote' | 'pre') { editorRef.current?.focus(); document.execCommand('formatBlock', false, tag); syncFromEditor() }
 
@@ -83,8 +91,8 @@ export default function App() {
       <button onClick={() => run('insertUnorderedList')}>• 목록</button><button onClick={() => run('insertOrderedList')}>1. 목록</button><button onClick={addLink}>링크</button><div className="divider" />
       <button onClick={insertTable}>＋ 표 삽입</button><button onClick={addTableRow}>행 추가</button><button onClick={addTableColumn}>열 추가</button><button className="danger" onClick={deleteTable}>표 삭제</button>
     </section>
-    <div className="mode-switch"><button className={!showSource ? 'active' : ''} onClick={() => setShowSource(false)}>편집</button><button className={showSource ? 'active' : ''} onClick={() => setShowSource(true)}>Markdown 원문</button></div>
-    {showSource ? <pre className="source-view">{markdown}</pre> : <article ref={editorRef} className="editor" contentEditable suppressContentEditableWarning onInput={syncFromEditor} onMouseUp={(event) => rememberActiveTable(event.target)} onKeyUp={(event) => rememberActiveTable(event.target)} dangerouslySetInnerHTML={{ __html: html }} />}
+    <div className="mode-switch"><button className={!showSource ? 'active' : ''} onClick={() => showSource && applySource()}>편집</button><button className={showSource ? 'active' : ''} onClick={openSource}>Markdown 원문</button>{showSource && <button className="apply-source" onClick={applySource}>변경사항 반영</button>}</div>
+    {showSource ? <textarea className="source-view" aria-label="Markdown 원문 편집기" value={sourceDraft} onChange={(event) => setSourceDraft(event.target.value)} spellCheck={false} /> : <article ref={editorRef} className="editor" contentEditable suppressContentEditableWarning onInput={syncFromEditor} onMouseUp={(event) => rememberActiveTable(event.target)} onKeyUp={(event) => rememberActiveTable(event.target)} dangerouslySetInnerHTML={{ __html: html }} />}
     <p className="hint">문서를 클릭해서 바로 수정하세요. 표 안의 셀을 클릭한 뒤 행·열을 추가할 수 있습니다.{frontMatter && ' Jekyll 메타데이터는 별도로 보존됩니다.'}</p>
   </main>
 }
